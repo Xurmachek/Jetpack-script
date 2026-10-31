@@ -235,6 +235,7 @@ local function doCoinsScan(showToast)
 end
 
 local collectThread = nil
+local savedStartCF = nil
 local function startCollecting()
     if isCollecting then return end
     local amount = tonumber(amountBox.Text)
@@ -245,6 +246,12 @@ local function startCollecting()
     end
     amount = math.floor(amount)
     if amount > 9999 then amount = 9999 end
+    -- сохраняем точку старта чтобы вернуться после сбора
+    do
+        local char0 = LocalPlayer.Character
+        local hrp0 = char0 and char0:FindFirstChild("HumanoidRootPart")
+        if hrp0 then savedStartCF = hrp0.CFrame else savedStartCF = nil end
+    end
     -- если кеш пуст — скан
     if #coinsCache == 0 then doCoinsScan(false) end
     if #coinsCache == 0 then
@@ -309,6 +316,18 @@ local function startCollecting()
         else
             notify("Coins", string.format("Остановлено %d/%d", collectedCount, targetCount))
         end
+        -- возвращаем на точку старта (через 0.3с чтобы сбор засчитался)
+        if savedStartCF then
+            task.wait(0.3)
+            local charR = LocalPlayer.Character
+            local hrpR = charR and charR:FindFirstChild("HumanoidRootPart")
+            if hrpR then
+                hrpR.CFrame = savedStartCF
+                pcall(function() hrpR.AssemblyLinearVelocity = Vector3.zero end)
+                hrpR.Velocity = Vector3.zero
+                notify("Coins", "Вернул на старт")
+            end
+        end
     end)
 end
 
@@ -320,6 +339,12 @@ local function stopCollecting()
     if stopBtn then stopBtn.Visible = false end
     updateCoinsUI()
     notify("Coins", "Остановлено")
+    if savedStartCF then
+        task.wait(0.2)
+        local charR = LocalPlayer.Character
+        local hrpR = charR and charR:FindFirstChild("HumanoidRootPart")
+        if hrpR then hrpR.CFrame = savedStartCF pcall(function() hrpR.AssemblyLinearVelocity = Vector3.zero end) hrpR.Velocity = Vector3.zero end
+    end
 end
 
 -- // Player TP helpers (for Teleporting bottom section)
@@ -1545,35 +1570,7 @@ stopBtn.MouseButton1Click:Connect(stopCollecting)
 startBtn.MouseEnter:Connect(function() tween(startBtn, {BackgroundColor3 = Color3.fromRGB(6,182,214)}, 0.12) end)
 startBtn.MouseLeave:Connect(function() tween(startBtn, {BackgroundColor3 = Color3.fromRGB(16,185,129)}, 0.12) end)
 
--- auto canvas size for teleport (просто грид)
-task.spawn(function()
-    task.wait(0.15)
-    local function updateCanvas()
-        local rows = math.ceil(#TELEPORTS / 2)
-        local needed = rows * 64 + 4
-        scroll.CanvasSize = UDim2.new(0, 0, 0, needed)
-        -- players list canvas
-        if psListHolder and playerListFrame then
-            local need = playerListFrame.AbsoluteContentSize.Y + 4
-            if need < 1 then need = 34 end
-            psListHolder.CanvasSize = UDim2.new(0,0,0, need)
-        end
-    end
-    updateCanvas()
-    grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() updateCanvas() end)
-    if playerListFrame then
-        playerListFrame:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() updateCanvas() end)
-    end
-    scroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(updateCanvas)
-    if psListHolder then
-        psListHolder:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(updateCanvas)
-    end
-    for i=1,20 do task.wait(0.1) updateCanvas() end
-end)
 
--- players search + refresh wiring
-task.spawn(function() task.wait(0.15) local function upd() local rows=math.ceil(#TELEPORTS/2) local gridH=rows*64+4 gridFrame.Size=UDim2.new(1,0,0,gridH) local needPL=playerListFrame.AbsoluteContentSize.Y+4 if needPL<1 then needPL=34 end if needPL>120 then needPL=120 end psListHolder.Size=UDim2.new(1,0,0,needPL) local playersH=18+26+8+needPL+20 -- header+search+gap+list+pad
- playersSection.Size=UDim2.new(1,0,0,playersH) local total=gridH+10+playersH+6 stack.Size=UDim2.new(1,-4,0,total) outerScroll.CanvasSize=UDim2.new(0,0,0,total+6) end upd() grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() upd() end) playerListFrame:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() upd() end) outerScroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(upd) for i=1,20 do task.wait(0.1) upd() end end)
 
 if playerSearchBox then
     playerSearchBox:GetPropertyChangedSignal("Text"):Connect(function()
