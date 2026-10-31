@@ -162,19 +162,19 @@ local targetCount = 0
 local coinsCache = {}
 
 -- forward для UI
-local amountBox, foundLabel, toCollectLabel, collectedLabel, progressBar, progressText, statusLabel, startBtn, stopBtn, scanBtn, coinsBadge, coinsHeaderSub
+local amountBox, foundLabel, toCollectLabel, collectedLabel, progressBar, progressText, statusLabel, startBtn, stopBtn, scanBtn, coinsBadge, coinsBadgeLabel, coinsHeaderSub
 
 local function updateCoinsUI()
     local found = #coinsCache
     if foundLabel then foundLabel.Text = "Найдено: " .. found end
     if toCollectLabel then toCollectLabel.Text = "К сбору: " .. targetCount end
     if collectedLabel then collectedLabel.Text = "Собрано: " .. collectedCount .. " / " .. targetCount end
-    if coinsBadge then
+    if coinsBadgeLabel then
         if isCollecting then
-            coinsBadge.TextLabel.Text = collectedCount .. "/" .. targetCount
+            coinsBadgeLabel.Text = collectedCount .. "/" .. targetCount
             coinsBadge.BackgroundColor3 = Color3.fromRGB(34,197,94)
         else
-            coinsBadge.TextLabel.Text = found .. " COINS"
+            coinsBadgeLabel.Text = found .. " COINS"
             coinsBadge.BackgroundColor3 = Color3.fromRGB(124,92,255)
         end
     end
@@ -745,7 +745,7 @@ badgeText.Parent = badge
 local scroll = Instance.new("ScrollingFrame")
 scroll.Name = "Scroll"
 scroll.Position = UDim2.fromOffset(12, 62)
-scroll.Size = UDim2.new(1, -24, 1, -164)
+scroll.Size = UDim2.new(1, -24, 1, -176)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.CanvasSize = UDim2.new(0,0,0,0)
@@ -766,7 +766,7 @@ grid.Parent = scroll
 -- players section at bottom of Teleporting (фиксированная, не внутри скролла)
 local playersSection = Instance.new("Frame")
 playersSection.Name = "PlayersSection"
-playersSection.Position = UDim2.new(0, 12, 1, -96)
+playersSection.Position = UDim2.new(0, 12, 1, -108)
 playersSection.Size = UDim2.new(1, -24, 0, 84)
 playersSection.BackgroundColor3 = Color3.fromRGB(20,20,25)
 playersSection.BorderSizePixel = 0
@@ -936,14 +936,15 @@ local cbGrad = Instance.new("UIGradient")
 cbGrad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, Color3.fromRGB(124,92,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(91,141,239))}
 cbGrad.Rotation = 90
 cbGrad.Parent = coinsBadge
-coinsBadge.TextLabel = Instance.new("TextLabel")
-coinsBadge.TextLabel.BackgroundTransparency = 1
-coinsBadge.TextLabel.Size = UDim2.fromScale(1,1)
-coinsBadge.TextLabel.Font = Enum.Font.GothamBold
-coinsBadge.TextLabel.Text = "0 COINS"
-coinsBadge.TextLabel.TextColor3 = Color3.fromRGB(255,255,255)
-coinsBadge.TextLabel.TextSize = 10
-coinsBadge.TextLabel.Parent = coinsBadge
+coinsBadgeLabel = Instance.new("TextLabel")
+coinsBadgeLabel.Name = "Label"
+coinsBadgeLabel.BackgroundTransparency = 1
+coinsBadgeLabel.Size = UDim2.fromScale(1,1)
+coinsBadgeLabel.Font = Enum.Font.GothamBold
+coinsBadgeLabel.Text = "0 COINS"
+coinsBadgeLabel.TextColor3 = Color3.fromRGB(255,255,255)
+coinsBadgeLabel.TextSize = 10
+coinsBadgeLabel.Parent = coinsBadge
 
 local coinsScroll = Instance.new("ScrollingFrame")
 coinsScroll.Name = "CoinsScroll"
