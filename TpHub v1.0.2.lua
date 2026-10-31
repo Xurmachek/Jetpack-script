@@ -742,11 +742,10 @@ badgeText.TextColor3 = Color3.fromRGB(255,255,255)
 badgeText.TextSize = 10
 badgeText.Parent = badge
 
--- outer scroll that holds both teleports grid and players section (вертикально)
 local scroll = Instance.new("ScrollingFrame")
 scroll.Name = "Scroll"
 scroll.Position = UDim2.fromOffset(12, 62)
-scroll.Size = UDim2.new(1, -24, 1, -74)
+scroll.Size = UDim2.new(1, -24, 1, -164)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.CanvasSize = UDim2.new(0,0,0,0)
@@ -756,43 +755,22 @@ scroll.ScrollingDirection = Enum.ScrollingDirection.Y
 scroll.AutomaticCanvasSize = Enum.AutomaticSize.None
 scroll.Parent = teleportPage
 
-local teleportContainer = Instance.new("Frame")
-teleportContainer.Name = "TeleportContainer"
-teleportContainer.Size = UDim2.new(1, -4, 0, 600)
-teleportContainer.BackgroundTransparency = 1
-teleportContainer.Parent = scroll
-local tList = Instance.new("UIListLayout")
-tList.Padding = UDim.new(0, 10)
-tList.SortOrder = Enum.SortOrder.LayoutOrder
-tList.Parent = teleportContainer
-local tPad = Instance.new("UIPadding")
-tPad.PaddingTop = UDim.new(0, 2)
-tPad.PaddingBottom = UDim.new(0, 6)
-tPad.Parent = teleportContainer
-
-local gridHolder = Instance.new("Frame")
-gridHolder.Name = "GridHolder"
-gridHolder.Size = UDim2.new(1, 0, 0, 400) -- высота пересчитается динамически
-gridHolder.BackgroundTransparency = 1
-gridHolder.LayoutOrder = 1
-gridHolder.Parent = teleportContainer
-
 local grid = Instance.new("UIGridLayout")
 grid.CellPadding = UDim2.fromOffset(8, 8)
 grid.CellSize = UDim2.fromOffset(212, 56)
 grid.FillDirectionMaxCells = 2
 grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
 grid.SortOrder = Enum.SortOrder.LayoutOrder
-grid.Parent = gridHolder
+grid.Parent = scroll
 
--- players section at bottom of Teleporting (внутри того же скролла)
+-- players section at bottom of Teleporting (фиксированная, не внутри скролла)
 local playersSection = Instance.new("Frame")
 playersSection.Name = "PlayersSection"
-playersSection.Size = UDim2.new(1, 0, 0, 164)
+playersSection.Position = UDim2.new(0, 12, 1, -96)
+playersSection.Size = UDim2.new(1, -24, 0, 84)
 playersSection.BackgroundColor3 = Color3.fromRGB(20,20,25)
 playersSection.BorderSizePixel = 0
-playersSection.LayoutOrder = 2
-playersSection.Parent = teleportContainer
+playersSection.Parent = teleportPage
 local psCorner = Instance.new("UICorner")
 psCorner.CornerRadius = UDim.new(0, 12)
 psCorner.Parent = playersSection
@@ -801,15 +779,15 @@ psStroke.Color = Color3.fromRGB(45,45,55)
 psStroke.Transparency = 0.4
 psStroke.Parent = playersSection
 local psPad = Instance.new("UIPadding")
-psPad.PaddingTop = UDim.new(0, 10)
-psPad.PaddingBottom = UDim.new(0, 10)
-psPad.PaddingLeft = UDim.new(0, 10)
-psPad.PaddingRight = UDim.new(0, 10)
+psPad.PaddingTop = UDim.new(0, 8)
+psPad.PaddingBottom = UDim.new(0, 8)
+psPad.PaddingLeft = UDim.new(0, 8)
+psPad.PaddingRight = UDim.new(0, 8)
 psPad.Parent = playersSection
 
 local psHeader = Instance.new("Frame")
 psHeader.BackgroundTransparency = 1
-psHeader.Size = UDim2.new(1, 0, 0, 20)
+psHeader.Size = UDim2.new(1, 0, 0, 18)
 psHeader.Parent = playersSection
 local psTitle = Instance.new("TextLabel")
 psTitle.BackgroundTransparency = 1
@@ -817,7 +795,7 @@ psTitle.Size = UDim2.new(1, -90, 1, 0)
 psTitle.Font = Enum.Font.GothamBold
 psTitle.Text = "Teleport to Player"
 psTitle.TextColor3 = Color3.fromRGB(255,255,255)
-psTitle.TextSize = 12
+psTitle.TextSize = 11
 psTitle.TextXAlignment = Enum.TextXAlignment.Left
 psTitle.Parent = psHeader
 playerCountLabel = Instance.new("TextLabel")
@@ -833,7 +811,7 @@ playerCountLabel.Parent = psHeader
 
 local psSearchRow = Instance.new("Frame")
 psSearchRow.BackgroundTransparency = 1
-psSearchRow.Size = UDim2.new(1, 0, 0, 30)
+psSearchRow.Size = UDim2.new(1, 0, 0, 26)
 psSearchRow.Parent = playersSection
 local psLayout = Instance.new("UIListLayout")
 psLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -842,7 +820,7 @@ psLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 psLayout.Parent = psSearchRow
 
 local searchBoxFrame = Instance.new("Frame")
-searchBoxFrame.Size = UDim2.new(1, -42, 0, 30)
+searchBoxFrame.Size = UDim2.new(1, -42, 0, 26)
 searchBoxFrame.BackgroundColor3 = Color3.fromRGB(26,26,32)
 searchBoxFrame.Parent = psSearchRow
 local sbfC = Instance.new("UICorner")
@@ -854,16 +832,16 @@ sbfS.Transparency = 0.4
 sbfS.Parent = searchBoxFrame
 local searchIcon = Instance.new("TextLabel")
 searchIcon.BackgroundTransparency = 1
-searchIcon.Size = UDim2.fromOffset(26, 30)
+searchIcon.Size = UDim2.fromOffset(22, 26)
 searchIcon.Font = Enum.Font.Gotham
 searchIcon.Text = "⌕"
 searchIcon.TextColor3 = Color3.fromRGB(110,110,125)
-searchIcon.TextSize = 14
+searchIcon.TextSize = 13
 searchIcon.Parent = searchBoxFrame
 playerSearchBox = Instance.new("TextBox")
 playerSearchBox.BackgroundTransparency = 1
-playerSearchBox.Position = UDim2.fromOffset(24, 0)
-playerSearchBox.Size = UDim2.new(1, -30, 1, 0)
+playerSearchBox.Position = UDim2.fromOffset(22, 0)
+playerSearchBox.Size = UDim2.new(1, -28, 1, 0)
 playerSearchBox.Font = Enum.Font.Gotham
 playerSearchBox.PlaceholderText = "Поиск по нику..."
 playerSearchBox.Text = ""
@@ -875,11 +853,11 @@ playerSearchBox.TextXAlignment = Enum.TextXAlignment.Left
 playerSearchBox.Parent = searchBoxFrame
 
 playerRefreshBtn = Instance.new("TextButton")
-playerRefreshBtn.Size = UDim2.fromOffset(36, 30)
+playerRefreshBtn.Size = UDim2.fromOffset(32, 26)
 playerRefreshBtn.BackgroundColor3 = Color3.fromRGB(32,32,38)
 playerRefreshBtn.Text = "↻"
 playerRefreshBtn.Font = Enum.Font.GothamBold
-playerRefreshBtn.TextSize = 14
+playerRefreshBtn.TextSize = 13
 playerRefreshBtn.TextColor3 = Color3.fromRGB(170,170,180)
 playerRefreshBtn.AutoButtonColor = false
 playerRefreshBtn.Parent = psSearchRow
@@ -887,19 +865,26 @@ local prC = Instance.new("UICorner")
 prC.CornerRadius = UDim.new(0, 8)
 prC.Parent = playerRefreshBtn
 
-local psListHolder = Instance.new("Frame")
+local psListHolder = Instance.new("ScrollingFrame")
+psListHolder.Name = "PlayersListHolder"
 psListHolder.BackgroundTransparency = 1
-psListHolder.Size = UDim2.new(1, 0, 0, 84)
+psListHolder.Size = UDim2.new(1, 0, 0, 34)
+psListHolder.BorderSizePixel = 0
+psListHolder.CanvasSize = UDim2.new(0,0,0,0)
+psListHolder.ScrollBarThickness = 3
+psListHolder.ScrollBarImageColor3 = Color3.fromRGB(65,65,75)
 psListHolder.Parent = playersSection
--- actual list is scrolling inside? Для простоты — обычный фрейм с UIListLayout, а скролл внешний уже крутит всё
 playerListFrame = Instance.new("Frame")
 playerListFrame.BackgroundTransparency = 1
-playerListFrame.Size = UDim2.new(1, 0, 1, 0)
+playerListFrame.Size = UDim2.new(1, -4, 1, 0)
 playerListFrame.Parent = psListHolder
 local plLayout = Instance.new("UIListLayout")
 plLayout.Padding = UDim.new(0, 4)
 plLayout.SortOrder = Enum.SortOrder.LayoutOrder
 plLayout.Parent = playerListFrame
+local plPad = Instance.new("UIPadding")
+plPad.PaddingRight = UDim.new(0, 4)
+plPad.Parent = psListHolder
 
 -- ================= COINS PAGE =================
 local coinsPage = Instance.new("Frame")
@@ -1560,7 +1545,7 @@ for idx, tp in ipairs(TELEPORTS) do
     card.Text = ""
     card.AutoButtonColor = false
     card.LayoutOrder = idx
-    card.Parent = gridHolder
+    card.Parent = scroll
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = card
@@ -1705,45 +1690,29 @@ stopBtn.MouseButton1Click:Connect(stopCollecting)
 startBtn.MouseEnter:Connect(function() tween(startBtn, {BackgroundColor3 = Color3.fromRGB(6,182,214)}, 0.12) end)
 startBtn.MouseLeave:Connect(function() tween(startBtn, {BackgroundColor3 = Color3.fromRGB(16,185,129)}, 0.12) end)
 
--- auto canvas size for teleport + players (теперь скролл содержит и грид и секцию игроков)
+-- auto canvas size for teleport (просто грид)
 task.spawn(function()
     task.wait(0.15)
     local function updateCanvas()
         local rows = math.ceil(#TELEPORTS / 2)
-        local gridH = rows * 64 + 4
-        gridHolder.Size = UDim2.new(1, 0, 0, gridH)
-        local playersH = 164
-        local gap = 10
-        local total = gridH + gap + playersH + 8
-        teleportContainer.Size = UDim2.new(1, -4, 0, total)
-        scroll.CanvasSize = UDim2.new(0, 0, 0, total + 6)
-        -- динамическая высота списка игроков (если много — растёт)
-        local plCount = 0
-        if playerListFrame then
-            for _, ch in ipairs(playerListFrame:GetChildren()) do
-                if ch:IsA("GuiObject") and ch:IsA("Frame") then plCount += 1 end
-            end
-            -- если много игроков, расширяем playersSection
-            if plCount > 2 then
-                local needPL = math.min(plCount * 38 + 4, 120)
-                psListHolder.Size = UDim2.new(1, 0, 0, needPL)
-                playersSection.Size = UDim2.new(1, 0, 0, 44 + needPL + 10)
-                total = gridH + gap + playersSection.Size.Y.Offset + 8
-                teleportContainer.Size = UDim2.new(1, -4, 0, total)
-                scroll.CanvasSize = UDim2.new(0, 0, 0, total + 6)
-            else
-                psListHolder.Size = UDim2.new(1, 0, 0, 84)
-                playersSection.Size = UDim2.new(1, 0, 0, 164)
-            end
+        local needed = rows * 64 + 4
+        scroll.CanvasSize = UDim2.new(0, 0, 0, needed)
+        -- players list canvas
+        if psListHolder and playerListFrame then
+            local need = playerListFrame.AbsoluteContentSize.Y + 4
+            if need < 1 then need = 34 end
+            psListHolder.CanvasSize = UDim2.new(0,0,0, need)
         end
     end
     updateCanvas()
     grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() updateCanvas() end)
     if playerListFrame then
-        playerListFrame.ChildAdded:Connect(function() task.wait() updateCanvas() end)
-        playerListFrame.ChildRemoved:Connect(function() task.wait() updateCanvas() end)
+        playerListFrame:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() updateCanvas() end)
     end
     scroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(updateCanvas)
+    if psListHolder then
+        psListHolder:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(updateCanvas)
+    end
     for i=1,20 do task.wait(0.1) updateCanvas() end
 end)
 
