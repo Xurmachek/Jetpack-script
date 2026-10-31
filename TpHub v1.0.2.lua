@@ -73,10 +73,11 @@ local function doTeleport(x, y, z, label, noToast)
     if not noToast then notify("Телепорт → " .. label, string.format("X:%d Y:%d Z:%d", x, y, z)) end
 end
 
--- // Coins logic
+-- // Coins & WorldPivot logic
 local function round3(n)
     -- до 3 знаков чтобы избежать багов, как в ТЗ
-    return tonumber(string.format("%.3f", n))
+    local formatted = string.format("%.3f", n):gsub(",", ".")
+    return (tonumber(formatted) or (math.floor(n * 1000 + 0.5) / 1000)) + 0
 end
 
 local function parseWorldPivotToVector3(pivot)
@@ -100,6 +101,45 @@ local function parseWorldPivotToVector3(pivot)
     return nil
 end
 
+local function extractWorldPivotPos(inst)
+    if not inst then return nil end
+    local pos = nil
+    -- 1) WorldPivot (Model) -> строка "x, y, z, ..." -> выделяем первые 3 координаты -> 3 знака после запятой
+    local ok, wp = pcall(function() return inst.WorldPivot end)
+    if ok and wp ~= nil then
+        pos = parseWorldPivotToVector3(tostring(wp)) or parseWorldPivotToVector3(wp)
+    end
+    -- 2) GetPivot
+    if not pos then
+        local ok2, gp = pcall(function() return inst:GetPivot() end)
+        if ok2 and gp ~= nil then
+            pos = parseWorldPivotToVector3(tostring(gp)) or parseWorldPivotToVector3(gp)
+        end
+    end
+    -- 3) BasePart.Position
+    if not pos and inst:IsA("BasePart") then
+        pos = Vector3.new(round3(inst.Position.X), round3(inst.Position.Y), round3(inst.Position.Z))
+    end
+    -- 4) Model.PrimaryPart / HumanoidRootPart
+    if not pos and inst:IsA("Model") then
+        local ok3, pp = pcall(function() return inst.PrimaryPart or inst:FindFirstChild("HumanoidRootPart") end)
+        if ok3 and pp and pp:IsA("BasePart") then
+            pos = Vector3.new(round3(pp.Position.X), round3(pp.Position.Y), round3(pp.Position.Z))
+        end
+    end
+    -- 5) любой BasePart внутри
+    if not pos then
+        local part = inst:FindFirstChildWhichIsA("BasePart", true)
+        if part then pos = Vector3.new(round3(part.Position.X), round3(part.Position.Y), round3(part.Position.Z)) end
+    end
+    -- 6) атрибут WorldPivot как строка (на случай если хранят строкой)
+    if not pos then
+        local ok4, attr = pcall(function() return inst:GetAttribute("WorldPivot") end)
+        if ok4 and attr ~= nil then pos = parseWorldPivotToVector3(attr) end
+    end
+    return pos
+end
+
 local function scanMutationCoins()
     local okRoot, root = pcall(function() return workspace:FindFirstChild("MutationCoins") end)
     if not okRoot or not root then return {}, "MutationCoins не найдена в Workspace" end
@@ -111,46 +151,12 @@ local function scanMutationCoins()
         if inst.Name:match("^MutationCoin_") then
             if seen[inst] then continue end
             seen[inst] = true
-            local pos = nil
-            -- 1) WorldPivot (Model)
-            local ok, wp = pcall(function() return inst.WorldPivot end)
-            if ok and wp and typeof(wp) == "CFrame" then
-                pos = Vector3.new(round3(wp.Position.X), round3(wp.Position.Y), round3(wp.Position.Z))
-            end
-            -- 2) GetPivot
-            if not pos then
-                local ok2, gp = pcall(function() return inst:GetPivot() end)
-                if ok2 and gp and typeof(gp) == "CFrame" then
-                    pos = Vector3.new(round3(gp.Position.X), round3(gp.Position.Y), round3(gp.Position.Z))
-                end
-            end
-            -- 3) BasePart.Position
-            if not pos and inst:IsA("BasePart") then
-                pos = Vector3.new(round3(inst.Position.X), round3(inst.Position.Y), round3(inst.Position.Z))
-            end
-            -- 4) Model.PrimaryPart
-            if not pos and inst:IsA("Model") then
-                local ok3, pp = pcall(function() return inst.PrimaryPart end)
-                if ok3 and pp and pp:IsA("BasePart") then
-                    pos = Vector3.new(round3(pp.Position.X), round3(pp.Position.Y), round3(pp.Position.Z))
-                end
-            end
-            -- 5) любой BasePart внутри
-            if not pos then
-                local part = inst:FindFirstChildWhichIsA("BasePart", true)
-                if part then pos = Vector3.new(round3(part.Position.X), round3(part.Position.Y), round3(part.Position.Z)) end
-            end
-            -- 6) атрибут WorldPivot как строка (на случай если хранят строкой)
-            if not pos then
-                local ok4, attr = pcall(function() return inst:GetAttribute("WorldPivot") end)
-                if ok4 and attr then pos = parseWorldPivotToVector3(attr) end
-            end
+            local pos = extractWorldPivotPos(inst)
             if pos then
                 table.insert(out, {obj = inst, pos = pos, name = inst.Name})
             end
         end
     end
-    -- сортировка: по имени для детерминизма, либо по дистанции? сейчас как найдено
     table.sort(out, function(a,b) return a.name < b.name end)
     return out, nil
 end
@@ -275,12 +281,9 @@ local function startCollecting()
     notify("Coins", string.format("Старт сбора %d монет", targetCount))
 
     collectThread = task.spawn(function()
-        for idx, coin in ipairs(snapshot) do
+        for _, coin in ipairs(snapshot) do
             if not isCollecting then break end
-            -- если монету уже собрали (исчезла) — скипаем но считаем?
             if coin.obj and not coin.obj.Parent then
-                -- пробуем найти замену: берём следующую из актуального кеша
-                -- но проще пропускаем
                 collectedCount += 1
                 updateCoinsUI()
                 task.wait(0.05)
@@ -296,7 +299,7 @@ local function startCollecting()
             end
             if hrp then
                 -- используем exact rounded pos + небольшой оффсет по Y
-                local target = CFrame.new(pos.X, pos.Y + 1.2, pos.Z)
+                local target = CFrame.new(pos.X, round3(pos.Y + 1.2), pos.Z)
                 -- инстант для сбора монет — надёжнее чем твин
                 hrp.CFrame = target
                 pcall(function() hrp.AssemblyLinearVelocity = Vector3.zero end)
@@ -347,42 +350,83 @@ local function stopCollecting()
     end
 end
 
--- // Player TP helpers (for Teleporting bottom section)
+-- // Player TP helpers (Workspace -> {имя игрока} -> WorldPivot -> 3 знака -> телепорт)
 local playerSearchText = ""
 local playerListFrame, playerSearchBox, playerCountLabel, playerRefreshBtn
-local function getHRP(char)
-    if not char then return nil end
-    return char:FindFirstChild("HumanoidRootPart")
+
+local function getPlayerWorldPivotPos(targetPlayer)
+    if not targetPlayer then
+        return nil, "Игрок не выбран"
+    end
+    local playerName = (typeof(targetPlayer) == "Instance") and targetPlayer.Name or tostring(targetPlayer)
+    if playerName == "" then
+        return nil, "Пустое имя игрока"
+    end
+
+    -- Workspace -> {имя игрока}
+    local okFind, playerObj = pcall(function()
+        return workspace:FindFirstChild(playerName)
+    end)
+    if okFind and playerObj and not playerObj:IsA("PVInstance") then
+        for _, ch in ipairs(workspace:GetChildren()) do
+            if ch.Name == playerName and ch:IsA("PVInstance") then
+                playerObj = ch
+                break
+            end
+        end
+    end
+    if (not okFind or not playerObj) and typeof(targetPlayer) == "Instance" and targetPlayer:IsA("Player") then
+        playerObj = targetPlayer.Character
+    end
+    if not playerObj then
+        return nil, string.format("Игрок %s не найден в Workspace", playerName)
+    end
+
+    local pos = extractWorldPivotPos(playerObj)
+    if not pos then
+        return nil, string.format("WorldPivot у %s не найден", playerName)
+    end
+    return pos, nil
 end
+
 local function teleportToPlayer(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then
-        notify("Игрок", "У игрока нет персонажа")
+    local pos, err = getPlayerWorldPivotPos(targetPlayer)
+    if not pos then
+        notify("Игрок", err or "Не удалось прочитать WorldPivot")
+        if _G.__teleportToast then _G.__teleportToast("Ошибка", err or "WorldPivot не найден") end
         return
     end
-    local targetHRP = getHRP(targetPlayer.Character)
-    if not targetHRP then
-        notify("Игрок", "HumanoidRootPart цели не найден")
-        return
-    end
+
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart", 5)
-    if not hrp then return end
-    -- тп чуть в сторону от цели чтобы не застрять внутри
-    local offset = targetHRP.CFrame.LookVector * 3 + Vector3.new(0, 1.5, 0)
-    local target = CFrame.new(targetHRP.Position + offset)
-    -- прямой CFrame + обнуление скорости
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        hrp = char and char:WaitForChild("HumanoidRootPart", 5)
+    end
+    if not hrp then
+        notify("Ошибка", "HumanoidRootPart не найден")
+        return
+    end
+
+    -- Телепорт почти так же как к монетам: координаты с 3 знаками после запятой + небольшой оффсет по Y
+    local tx, ty, tz = pos.X, round3(pos.Y + 1.2), pos.Z
+    local target = CFrame.new(tx, ty, tz)
     hrp.CFrame = target
     pcall(function() hrp.AssemblyLinearVelocity = Vector3.zero end)
     hrp.Velocity = Vector3.zero
-    notify("Телепорт → " .. targetPlayer.Name, string.format("К игроку %s (@%s)", targetPlayer.DisplayName, targetPlayer.Name))
-    if _G.__teleportToast then _G.__teleportToast("→ " .. targetPlayer.Name, string.format("X:%.0f Y:%.0f Z:%.0f", targetHRP.Position.X, targetHRP.Position.Y, targetHRP.Position.Z)) end
+
+    local pName = (typeof(targetPlayer) == "Instance") and targetPlayer.Name or tostring(targetPlayer)
+    local coordStr = string.format("%.3f, %.3f, %.3f", pos.X, pos.Y, pos.Z)
+    notify("Телепорт → " .. pName, string.format("X:%.3f Y:%.3f Z:%.3f", pos.X, pos.Y, pos.Z))
+    if _G.__teleportToast then
+        _G.__teleportToast("→ " .. pName, coordStr)
+    end
 end
 
 local function refreshPlayerList()
     if not playerListFrame then return end
     -- очищаем старые
     for _, ch in ipairs(playerListFrame:GetChildren()) do
-        if ch:IsA("Frame") or ch:IsA("TextButton") then ch:Destroy() end
+        if ch:IsA("Frame") or ch:IsA("TextButton") or ch:IsA("TextLabel") then ch:Destroy() end
     end
     local players = Players:GetPlayers()
     -- фильтр
@@ -511,7 +555,7 @@ local main = Instance.new("Frame")
 main.Name = "Main"
 main.AnchorPoint = Vector2.new(0.5, 0.5)
 main.Position = UDim2.fromScale(0.5, 0.5)
-main.Size = UDim2.fromOffset(640, 420)
+main.Size = UDim2.fromOffset(640, 460)
 main.BackgroundColor3 = Color3.fromRGB(20,20,25)
 main.BorderSizePixel = 0
 main.ClipsDescendants = true
@@ -694,18 +738,47 @@ rightArea.Parent = content
 rightArea.ClipsDescendants = true
 
 -- ================= TELEPORT PAGE =================
-local teleportPage = Instance.new("Frame")
+-- Вся вкладка прокручивается целиком, как .page в preview.html.
+local teleportPage = Instance.new("ScrollingFrame")
 teleportPage.Name = "TeleportPage"
 teleportPage.Size = UDim2.fromScale(1,1)
 teleportPage.BackgroundTransparency = 1
+teleportPage.BorderSizePixel = 0
+teleportPage.CanvasSize = UDim2.new(0,0,0,0)
+teleportPage.ScrollBarThickness = 4
+teleportPage.ScrollBarImageColor3 = Color3.fromRGB(58,58,68)
+teleportPage.ScrollingDirection = Enum.ScrollingDirection.Y
+teleportPage.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+teleportPage.AutomaticCanvasSize = Enum.AutomaticSize.None
 teleportPage.Visible = true
 teleportPage.Parent = rightArea
 
+local teleportContent = Instance.new("Frame")
+teleportContent.Name = "TeleportContent"
+teleportContent.Size = UDim2.new(1,-4,0,0)
+teleportContent.BackgroundTransparency = 1
+teleportContent.BorderSizePixel = 0
+teleportContent.Parent = teleportPage
+
+local teleportPadding = Instance.new("UIPadding")
+teleportPadding.PaddingTop = UDim.new(0,12)
+teleportPadding.PaddingBottom = UDim.new(0,12)
+teleportPadding.PaddingLeft = UDim.new(0,12)
+teleportPadding.PaddingRight = UDim.new(0,12)
+teleportPadding.Parent = teleportContent
+
+local teleportContentLayout = Instance.new("UIListLayout")
+teleportContentLayout.FillDirection = Enum.FillDirection.Vertical
+teleportContentLayout.Padding = UDim.new(0,10)
+teleportContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+teleportContentLayout.Parent = teleportContent
+
 local header = Instance.new("Frame")
+header.Name = "Header"
 header.BackgroundTransparency = 1
-header.Size = UDim2.new(1, -24, 0, 48)
-header.Position = UDim2.fromOffset(12, 8)
-header.Parent = teleportPage
+header.Size = UDim2.new(1,-24,0,48)
+header.LayoutOrder = 1
+header.Parent = teleportContent
 
 local headerTitle = Instance.new("TextLabel")
 headerTitle.Name = "HeaderTitle"
@@ -753,15 +826,164 @@ badgeText.TextColor3 = Color3.fromRGB(255,255,255)
 badgeText.TextSize = 10
 badgeText.Parent = badge
 
-local scroll=Instance.new("ScrollingFrame") scroll.Name="Scroll" scroll.Position=UDim2.fromOffset(12,62) scroll.Size=UDim2.new(1,-24,1,-176) scroll.BackgroundTransparency=1 scroll.BorderSizePixel=0 scroll.CanvasSize=UDim2.new(0,0,0,0) scroll.ScrollBarThickness=4 scroll.ScrollBarImageColor3=Color3.fromRGB(65,65,75) scroll.ScrollingDirection=Enum.ScrollingDirection.Y scroll.AutomaticCanvasSize=Enum.AutomaticSize.None scroll.Parent=teleportPage
-local grid=Instance.new("UIGridLayout") grid.CellPadding=UDim2.fromOffset(8,8) grid.CellSize=UDim2.fromOffset(212,56) grid.FillDirectionMaxCells=2 grid.HorizontalAlignment=Enum.HorizontalAlignment.Left grid.SortOrder=Enum.SortOrder.LayoutOrder grid.Parent=scroll
--- players fixed bottom (как было до поломки, вне скролла)
-local playersSection=Instance.new("Frame") playersSection.Name="PlayersSection" playersSection.Position=UDim2.new(0,12,1,-120) playersSection.Size=UDim2.new(1,-24,0,96) playersSection.BackgroundColor3=Color3.fromRGB(20,20,25) playersSection.BorderSizePixel=0 playersSection.Parent=teleportPage local psc=Instance.new("UICorner") psc.CornerRadius=UDim.new(0,12) psc.Parent=playersSection local pss=Instance.new("UIStroke") pss.Color=Color3.fromRGB(45,45,55) pss.Transparency=0.4 pss.Parent=playersSection local psp=Instance.new("UIPadding") psp.PaddingTop=UDim.new(0,8) psp.PaddingBottom=UDim.new(0,8) psp.PaddingLeft=UDim.new(0,8) psp.PaddingRight=UDim.new(0,8) psp.Parent=playersSection
-local psHeader=Instance.new("Frame") psHeader.BackgroundTransparency=1 psHeader.Size=UDim2.new(1,0,0,18) psHeader.Parent=playersSection local psTitle=Instance.new("TextLabel") psTitle.BackgroundTransparency=1 psTitle.Size=UDim2.new(1,-90,1,0) psTitle.Font=Enum.Font.GothamBold psTitle.Text="Teleport to Player" psTitle.TextColor3=Color3.fromRGB(255,255,255) psTitle.TextSize=11 psTitle.TextXAlignment=Enum.TextXAlignment.Left psTitle.Parent=psHeader playerCountLabel=Instance.new("TextLabel") playerCountLabel.BackgroundTransparency=1 playerCountLabel.Position=UDim2.new(1,-90,0,0) playerCountLabel.Size=UDim2.new(0,90,1,0) playerCountLabel.Font=Enum.Font.Gotham playerCountLabel.Text="0 игроков" playerCountLabel.TextColor3=Color3.fromRGB(110,110,125) playerCountLabel.TextSize=10 playerCountLabel.TextXAlignment=Enum.TextXAlignment.Right playerCountLabel.Parent=psHeader
-local psSearchRow=Instance.new("Frame") psSearchRow.BackgroundTransparency=1 psSearchRow.Size=UDim2.new(1,0,0,26) psSearchRow.Parent=playersSection local psl=Instance.new("UIListLayout") psl.FillDirection=Enum.FillDirection.Horizontal psl.Padding=UDim.new(0,6) psl.VerticalAlignment=Enum.VerticalAlignment.Center psl.Parent=psSearchRow
-local sbf=Instance.new("Frame") sbf.Size=UDim2.new(1,-42,0,26) sbf.BackgroundColor3=Color3.fromRGB(26,26,32) sbf.Parent=psSearchRow local sbfc=Instance.new("UICorner") sbfc.CornerRadius=UDim.new(0,8) sbfc.Parent=sbf local sbfs=Instance.new("UIStroke") sbfs.Color=Color3.fromRGB(55,55,65) sbfs.Transparency=0.4 sbfs.Parent=sbf local si=Instance.new("TextLabel") si.BackgroundTransparency=1 si.Size=UDim2.fromOffset(22,26) si.Font=Enum.Font.Gotham si.Text="⌕" si.TextColor3=Color3.fromRGB(110,110,125) si.TextSize=13 si.Parent=sbf playerSearchBox=Instance.new("TextBox") playerSearchBox.BackgroundTransparency=1 playerSearchBox.Position=UDim2.fromOffset(22,0) playerSearchBox.Size=UDim2.new(1,-28,1,0) playerSearchBox.Font=Enum.Font.Gotham playerSearchBox.PlaceholderText="Поиск по нику..." playerSearchBox.Text="" playerSearchBox.TextColor3=Color3.fromRGB(255,255,255) playerSearchBox.PlaceholderColor3=Color3.fromRGB(110,110,125) playerSearchBox.TextSize=11 playerSearchBox.ClearTextOnFocus=false playerSearchBox.TextXAlignment=Enum.TextXAlignment.Left playerSearchBox.Parent=sbf
-playerRefreshBtn=Instance.new("TextButton") playerRefreshBtn.Size=UDim2.fromOffset(32,26) playerRefreshBtn.BackgroundColor3=Color3.fromRGB(32,32,38) playerRefreshBtn.Text="↻" playerRefreshBtn.Font=Enum.Font.GothamBold playerRefreshBtn.TextSize=13 playerRefreshBtn.TextColor3=Color3.fromRGB(170,170,180) playerRefreshBtn.AutoButtonColor=false playerRefreshBtn.Parent=psSearchRow local prc=Instance.new("UICorner") prc.CornerRadius=UDim.new(0,8) prc.Parent=playerRefreshBtn
-local psListHolder=Instance.new("ScrollingFrame") psListHolder.Name="PlayersListHolder" psListHolder.BackgroundTransparency=1 psListHolder.Size=UDim2.new(1,0,0,58) psListHolder.BorderSizePixel=0 psListHolder.CanvasSize=UDim2.new(0,0,0,0) psListHolder.ScrollBarThickness=3 psListHolder.ScrollBarImageColor3=Color3.fromRGB(65,65,75) psListHolder.ScrollingDirection=Enum.ScrollingDirection.Y psListHolder.ScrollingEnabled=true psListHolder.VerticalScrollBarInset=Enum.ScrollBarInset.ScrollBar psListHolder.Parent=playersSection playerListFrame=Instance.new("Frame") playerListFrame.BackgroundTransparency=1 playerListFrame.Size=UDim2.new(1,-4,1,0) playerListFrame.Parent=psListHolder local pll=Instance.new("UIListLayout") pll.Padding=UDim.new(0,4) pll.FillDirection=Enum.FillDirection.Vertical pll.SortOrder=Enum.SortOrder.LayoutOrder pll.HorizontalAlignment=Enum.HorizontalAlignment.Left pll.Parent=playerListFrame local plp=Instance.new("UIPadding") plp.PaddingRight=UDim.new(0,4) plp.Parent=psListHolder
+-- Сетка занимает всю доступную ширину и всегда содержит две колонки.
+local gridHolder = Instance.new("Frame")
+gridHolder.Name = "TeleportGrid"
+gridHolder.Size = UDim2.new(1,-24,0,0)
+gridHolder.BackgroundTransparency = 1
+gridHolder.BorderSizePixel = 0
+gridHolder.LayoutOrder = 2
+gridHolder.Parent = teleportContent
+
+local grid = Instance.new("UIGridLayout")
+grid.CellPadding = UDim2.fromOffset(8,8)
+grid.CellSize = UDim2.new(0.5,-4,0,56)
+grid.FillDirectionMaxCells = 2
+grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+grid.SortOrder = Enum.SortOrder.LayoutOrder
+grid.Parent = gridHolder
+
+-- Блок игроков находится после сетки и прокручивается вместе с ней.
+local playersSection = Instance.new("Frame")
+playersSection.Name = "PlayersSection"
+playersSection.Size = UDim2.new(1,-24,0,116)
+playersSection.BackgroundColor3 = Color3.fromRGB(26,26,32)
+playersSection.BorderSizePixel = 0
+playersSection.LayoutOrder = 3
+playersSection.Parent = teleportContent
+local psc = Instance.new("UICorner")
+psc.CornerRadius = UDim.new(0,12)
+psc.Parent = playersSection
+local pss = Instance.new("UIStroke")
+pss.Color = Color3.fromRGB(45,45,55)
+pss.Transparency = 0.5
+pss.Parent = playersSection
+local psp = Instance.new("UIPadding")
+psp.PaddingTop = UDim.new(0,10)
+psp.PaddingBottom = UDim.new(0,10)
+psp.PaddingLeft = UDim.new(0,10)
+psp.PaddingRight = UDim.new(0,10)
+psp.Parent = playersSection
+
+local playersLayout = Instance.new("UIListLayout")
+playersLayout.FillDirection = Enum.FillDirection.Vertical
+playersLayout.Padding = UDim.new(0,8)
+playersLayout.SortOrder = Enum.SortOrder.LayoutOrder
+playersLayout.Parent = playersSection
+
+local psHeader = Instance.new("Frame")
+psHeader.BackgroundTransparency = 1
+psHeader.Size = UDim2.new(1,-20,0,18)
+psHeader.LayoutOrder = 1
+psHeader.Parent = playersSection
+local psTitle = Instance.new("TextLabel")
+psTitle.BackgroundTransparency = 1
+psTitle.Size = UDim2.new(1,-90,1,0)
+psTitle.Font = Enum.Font.GothamBold
+psTitle.Text = "Teleport to Player"
+psTitle.TextColor3 = Color3.fromRGB(255,255,255)
+psTitle.TextSize = 12
+psTitle.TextXAlignment = Enum.TextXAlignment.Left
+psTitle.Parent = psHeader
+playerCountLabel = Instance.new("TextLabel")
+playerCountLabel.BackgroundTransparency = 1
+playerCountLabel.Position = UDim2.new(1,-90,0,0)
+playerCountLabel.Size = UDim2.new(0,90,1,0)
+playerCountLabel.Font = Enum.Font.Gotham
+playerCountLabel.Text = "0 игроков"
+playerCountLabel.TextColor3 = Color3.fromRGB(110,110,125)
+playerCountLabel.TextSize = 10
+playerCountLabel.TextXAlignment = Enum.TextXAlignment.Right
+playerCountLabel.Parent = psHeader
+
+local psSearchRow = Instance.new("Frame")
+psSearchRow.BackgroundTransparency = 1
+psSearchRow.Size = UDim2.new(1,-20,0,30)
+psSearchRow.LayoutOrder = 2
+psSearchRow.Parent = playersSection
+local psl = Instance.new("UIListLayout")
+psl.FillDirection = Enum.FillDirection.Horizontal
+psl.Padding = UDim.new(0,6)
+psl.VerticalAlignment = Enum.VerticalAlignment.Center
+psl.SortOrder = Enum.SortOrder.LayoutOrder
+psl.Parent = psSearchRow
+
+local sbf = Instance.new("Frame")
+sbf.Size = UDim2.new(1,-42,0,30)
+sbf.BackgroundColor3 = Color3.fromRGB(20,20,25)
+sbf.BorderSizePixel = 0
+sbf.LayoutOrder = 1
+sbf.Parent = psSearchRow
+local sbfc = Instance.new("UICorner")
+sbfc.CornerRadius = UDim.new(0,8)
+sbfc.Parent = sbf
+local sbfs = Instance.new("UIStroke")
+sbfs.Color = Color3.fromRGB(55,55,65)
+sbfs.Transparency = 0.4
+sbfs.Parent = sbf
+local si = Instance.new("TextLabel")
+si.BackgroundTransparency = 1
+si.Size = UDim2.fromOffset(22,30)
+si.Font = Enum.Font.Gotham
+si.Text = "⌕"
+si.TextColor3 = Color3.fromRGB(110,110,125)
+si.TextSize = 14
+si.Parent = sbf
+playerSearchBox = Instance.new("TextBox")
+playerSearchBox.BackgroundTransparency = 1
+playerSearchBox.Position = UDim2.fromOffset(22,0)
+playerSearchBox.Size = UDim2.new(1,-28,1,0)
+playerSearchBox.Font = Enum.Font.Gotham
+playerSearchBox.PlaceholderText = "Поиск по нику..."
+playerSearchBox.Text = ""
+playerSearchBox.TextColor3 = Color3.fromRGB(255,255,255)
+playerSearchBox.PlaceholderColor3 = Color3.fromRGB(110,110,125)
+playerSearchBox.TextSize = 11
+playerSearchBox.ClearTextOnFocus = false
+playerSearchBox.TextXAlignment = Enum.TextXAlignment.Left
+playerSearchBox.Parent = sbf
+
+playerRefreshBtn = Instance.new("TextButton")
+playerRefreshBtn.Size = UDim2.fromOffset(36,30)
+playerRefreshBtn.BackgroundColor3 = Color3.fromRGB(32,32,38)
+playerRefreshBtn.Text = "↻"
+playerRefreshBtn.Font = Enum.Font.GothamBold
+playerRefreshBtn.TextSize = 14
+playerRefreshBtn.TextColor3 = Color3.fromRGB(170,170,180)
+playerRefreshBtn.AutoButtonColor = false
+playerRefreshBtn.LayoutOrder = 2
+playerRefreshBtn.Parent = psSearchRow
+local prc = Instance.new("UICorner")
+prc.CornerRadius = UDim.new(0,8)
+prc.Parent = playerRefreshBtn
+
+local psListHolder = Instance.new("ScrollingFrame")
+psListHolder.Name = "PlayersListHolder"
+psListHolder.BackgroundTransparency = 1
+psListHolder.Size = UDim2.new(1,-20,0,32)
+psListHolder.BorderSizePixel = 0
+psListHolder.CanvasSize = UDim2.new(0,0,0,0)
+psListHolder.ScrollBarThickness = 3
+psListHolder.ScrollBarImageColor3 = Color3.fromRGB(65,65,75)
+psListHolder.ScrollingDirection = Enum.ScrollingDirection.Y
+psListHolder.ScrollingEnabled = true
+psListHolder.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+psListHolder.LayoutOrder = 3
+psListHolder.Parent = playersSection
+
+playerListFrame = Instance.new("Frame")
+playerListFrame.BackgroundTransparency = 1
+playerListFrame.Size = UDim2.new(1,-4,1,0)
+playerListFrame.Parent = psListHolder
+local pll = Instance.new("UIListLayout")
+pll.Padding = UDim.new(0,4)
+pll.FillDirection = Enum.FillDirection.Vertical
+pll.SortOrder = Enum.SortOrder.LayoutOrder
+pll.HorizontalAlignment = Enum.HorizontalAlignment.Left
+pll.Parent = playerListFrame
+local plp = Instance.new("UIPadding")
+plp.PaddingRight = UDim.new(0,4)
+plp.Parent = psListHolder
 
 -- ================= COINS PAGE =================
 local coinsPage = Instance.new("Frame")
@@ -1423,7 +1645,7 @@ for idx, tp in ipairs(TELEPORTS) do
     card.Text = ""
     card.AutoButtonColor = false
     card.LayoutOrder = idx
-    card.Parent = scroll
+    card.Parent = gridHolder
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = card
@@ -1568,15 +1790,54 @@ stopBtn.MouseButton1Click:Connect(stopCollecting)
 startBtn.MouseEnter:Connect(function() tween(startBtn, {BackgroundColor3 = Color3.fromRGB(6,182,214)}, 0.12) end)
 startBtn.MouseLeave:Connect(function() tween(startBtn, {BackgroundColor3 = Color3.fromRGB(16,185,129)}, 0.12) end)
 
+task.spawn(function()
+    task.wait(0.15)
 
+    local function updateTeleportCanvas()
+        -- UIGridLayout calculates the exact height for all six rows.
+        gridHolder.Size = UDim2.new(1,-24,0,grid.AbsoluteContentSize.Y)
 
-task.spawn(function() task.wait(0.15) local function upd() local rows=math.ceil(#TELEPORTS/2) scroll.CanvasSize=UDim2.new(0,0,0,rows*64+4) if psListHolder and playerListFrame then local need=playerListFrame.AbsoluteContentSize.Y+4 if need<1 then need=34 end psListHolder.CanvasSize=UDim2.new(0,0,0,need) end end upd() grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() upd() end) if playerListFrame then playerListFrame:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() upd() end) end scroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(upd) if psListHolder then psListHolder:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(upd) end for i=1,20 do task.wait(0.1) upd() end end)
+        if psListHolder and pll then
+            -- The HTML list grows with its rows up to 84px, then scrolls internally.
+            local contentY = pll.AbsoluteContentSize.Y
+            local listHeight = math.clamp(contentY, 32, 84)
+            psListHolder.Size = UDim2.new(1,-20,0,listHeight)
+            playersSection.Size = UDim2.new(1,-24,0,84 + listHeight)
+
+            local need = contentY + 4
+            if need < 34 then need = 34 end
+            psListHolder.CanvasSize = UDim2.new(0,0,0,need)
+        end
+
+        task.defer(function()
+            if not teleportPage.Parent then return end
+            local contentHeight = teleportContentLayout.AbsoluteContentSize.Y + 24
+            teleportContent.Size = UDim2.new(1,-4,0,contentHeight)
+            teleportPage.CanvasSize = UDim2.new(0,0,0,contentHeight)
+        end)
+    end
+
+    updateTeleportCanvas()
+    grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateTeleportCanvas)
+    teleportContentLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateTeleportCanvas)
+    if pll then
+        pll:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateTeleportCanvas)
+    end
+    if psListHolder then
+        psListHolder:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(updateTeleportCanvas)
+    end
+    teleportPage:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(updateTeleportCanvas)
+
+    for _ = 1, 10 do
+        task.wait(0.1)
+        updateTeleportCanvas()
+    end
+end)
 
 if playerSearchBox then
     playerSearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         playerSearchText = playerSearchBox.Text
         refreshPlayerList()
-        -- canvas пересчитается через ChildAdded
     end)
 end
 if playerRefreshBtn then
