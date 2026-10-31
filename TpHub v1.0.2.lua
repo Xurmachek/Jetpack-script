@@ -101,8 +101,8 @@ local function parseWorldPivotToVector3(pivot)
 end
 
 local function scanMutationCoins()
-    local root = workspace:FindFirstChild("MutationCoins")
-    if not root then return {}, "MutationCoins не найдена в Workspace" end
+    local okRoot, root = pcall(function() return workspace:FindFirstChild("MutationCoins") end)
+    if not okRoot or not root then return {}, "MutationCoins не найдена в Workspace" end
     local seen = {}
     local out = {}
     -- ищем все объекты с именем MutationCoin_*
@@ -415,21 +415,7 @@ local function refreshPlayerList()
         al.TextColor3 = Color3.fromRGB(124,92,255)
         al.TextSize = 12
         al.Parent = avatar
-        -- пробуем подтянуть аватар если есть Thumb API — не критично
-        pcall(function()
-            local thumb = Players:GetUserThumbnailAsync(p.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
-            if thumb then
-                local img = Instance.new("ImageLabel")
-                img.BackgroundTransparency = 1
-                img.Size = UDim2.fromScale(1,1)
-                img.Image = thumb
-                img.Parent = avatar
-                local ic2 = Instance.new("UICorner")
-                ic2.CornerRadius = UDim.new(1,0)
-                ic2.Parent = img
-                al.Visible = false
-            end
-        end)
+        -- аватар упрощён до инициала (убрал GetUserThumbnailAsync — крашил Roblox при частом обновлении)
         local nameLbl = Instance.new("TextLabel")
         nameLbl.BackgroundTransparency = 1
         nameLbl.Position = UDim2.fromOffset(36, 4)
@@ -742,150 +728,18 @@ badgeText.TextColor3 = Color3.fromRGB(255,255,255)
 badgeText.TextSize = 10
 badgeText.Parent = badge
 
-local scroll = Instance.new("ScrollingFrame")
-scroll.Name = "Scroll"
-scroll.Position = UDim2.fromOffset(12, 62)
-scroll.Size = UDim2.new(1, -24, 1, -176)
-scroll.BackgroundTransparency = 1
-scroll.BorderSizePixel = 0
-scroll.CanvasSize = UDim2.new(0,0,0,0)
-scroll.ScrollBarThickness = 4
-scroll.ScrollBarImageColor3 = Color3.fromRGB(65,65,75)
-scroll.ScrollingDirection = Enum.ScrollingDirection.Y
-scroll.AutomaticCanvasSize = Enum.AutomaticSize.None
-scroll.Parent = teleportPage
-
-local grid = Instance.new("UIGridLayout")
-grid.CellPadding = UDim2.fromOffset(8, 8)
-grid.CellSize = UDim2.fromOffset(212, 56)
-grid.FillDirectionMaxCells = 2
-grid.HorizontalAlignment = Enum.HorizontalAlignment.Left
-grid.SortOrder = Enum.SortOrder.LayoutOrder
-grid.Parent = scroll
-
--- players section at bottom of Teleporting (фиксированная, не внутри скролла)
-local playersSection = Instance.new("Frame")
-playersSection.Name = "PlayersSection"
-playersSection.Position = UDim2.new(0, 12, 1, -108)
-playersSection.Size = UDim2.new(1, -24, 0, 84)
-playersSection.BackgroundColor3 = Color3.fromRGB(20,20,25)
-playersSection.BorderSizePixel = 0
-playersSection.Parent = teleportPage
-local psCorner = Instance.new("UICorner")
-psCorner.CornerRadius = UDim.new(0, 12)
-psCorner.Parent = playersSection
-local psStroke = Instance.new("UIStroke")
-psStroke.Color = Color3.fromRGB(45,45,55)
-psStroke.Transparency = 0.4
-psStroke.Parent = playersSection
-local psPad = Instance.new("UIPadding")
-psPad.PaddingTop = UDim.new(0, 8)
-psPad.PaddingBottom = UDim.new(0, 8)
-psPad.PaddingLeft = UDim.new(0, 8)
-psPad.PaddingRight = UDim.new(0, 8)
-psPad.Parent = playersSection
-
-local psHeader = Instance.new("Frame")
-psHeader.BackgroundTransparency = 1
-psHeader.Size = UDim2.new(1, 0, 0, 18)
-psHeader.Parent = playersSection
-local psTitle = Instance.new("TextLabel")
-psTitle.BackgroundTransparency = 1
-psTitle.Size = UDim2.new(1, -90, 1, 0)
-psTitle.Font = Enum.Font.GothamBold
-psTitle.Text = "Teleport to Player"
-psTitle.TextColor3 = Color3.fromRGB(255,255,255)
-psTitle.TextSize = 11
-psTitle.TextXAlignment = Enum.TextXAlignment.Left
-psTitle.Parent = psHeader
-playerCountLabel = Instance.new("TextLabel")
-playerCountLabel.BackgroundTransparency = 1
-playerCountLabel.Position = UDim2.new(1, -90, 0, 0)
-playerCountLabel.Size = UDim2.new(0, 90, 1, 0)
-playerCountLabel.Font = Enum.Font.Gotham
-playerCountLabel.Text = "0 игроков"
-playerCountLabel.TextColor3 = Color3.fromRGB(110,110,125)
-playerCountLabel.TextSize = 10
-playerCountLabel.TextXAlignment = Enum.TextXAlignment.Right
-playerCountLabel.Parent = psHeader
-
-local psSearchRow = Instance.new("Frame")
-psSearchRow.BackgroundTransparency = 1
-psSearchRow.Size = UDim2.new(1, 0, 0, 26)
-psSearchRow.Parent = playersSection
-local psLayout = Instance.new("UIListLayout")
-psLayout.FillDirection = Enum.FillDirection.Horizontal
-psLayout.Padding = UDim.new(0, 6)
-psLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-psLayout.Parent = psSearchRow
-
-local searchBoxFrame = Instance.new("Frame")
-searchBoxFrame.Size = UDim2.new(1, -42, 0, 26)
-searchBoxFrame.BackgroundColor3 = Color3.fromRGB(26,26,32)
-searchBoxFrame.Parent = psSearchRow
-local sbfC = Instance.new("UICorner")
-sbfC.CornerRadius = UDim.new(0, 8)
-sbfC.Parent = searchBoxFrame
-local sbfS = Instance.new("UIStroke")
-sbfS.Color = Color3.fromRGB(55,55,65)
-sbfS.Transparency = 0.4
-sbfS.Parent = searchBoxFrame
-local searchIcon = Instance.new("TextLabel")
-searchIcon.BackgroundTransparency = 1
-searchIcon.Size = UDim2.fromOffset(22, 26)
-searchIcon.Font = Enum.Font.Gotham
-searchIcon.Text = "⌕"
-searchIcon.TextColor3 = Color3.fromRGB(110,110,125)
-searchIcon.TextSize = 13
-searchIcon.Parent = searchBoxFrame
-playerSearchBox = Instance.new("TextBox")
-playerSearchBox.BackgroundTransparency = 1
-playerSearchBox.Position = UDim2.fromOffset(22, 0)
-playerSearchBox.Size = UDim2.new(1, -28, 1, 0)
-playerSearchBox.Font = Enum.Font.Gotham
-playerSearchBox.PlaceholderText = "Поиск по нику..."
-playerSearchBox.Text = ""
-playerSearchBox.TextColor3 = Color3.fromRGB(255,255,255)
-playerSearchBox.PlaceholderColor3 = Color3.fromRGB(110,110,125)
-playerSearchBox.TextSize = 11
-playerSearchBox.ClearTextOnFocus = false
-playerSearchBox.TextXAlignment = Enum.TextXAlignment.Left
-playerSearchBox.Parent = searchBoxFrame
-
-playerRefreshBtn = Instance.new("TextButton")
-playerRefreshBtn.Size = UDim2.fromOffset(32, 26)
-playerRefreshBtn.BackgroundColor3 = Color3.fromRGB(32,32,38)
-playerRefreshBtn.Text = "↻"
-playerRefreshBtn.Font = Enum.Font.GothamBold
-playerRefreshBtn.TextSize = 13
-playerRefreshBtn.TextColor3 = Color3.fromRGB(170,170,180)
-playerRefreshBtn.AutoButtonColor = false
-playerRefreshBtn.Parent = psSearchRow
-local prC = Instance.new("UICorner")
-prC.CornerRadius = UDim.new(0, 8)
-prC.Parent = playerRefreshBtn
-
-local psListHolder = Instance.new("ScrollingFrame")
-psListHolder.Name = "PlayersListHolder"
-psListHolder.BackgroundTransparency = 1
-psListHolder.Size = UDim2.new(1, 0, 0, 34)
-psListHolder.BorderSizePixel = 0
-psListHolder.CanvasSize = UDim2.new(0,0,0,0)
-psListHolder.ScrollBarThickness = 3
-psListHolder.ScrollBarImageColor3 = Color3.fromRGB(65,65,75)
-psListHolder.Parent = playersSection
-playerListFrame = Instance.new("Frame")
-playerListFrame.BackgroundTransparency = 1
-playerListFrame.Size = UDim2.new(1, -4, 1, 0)
-playerListFrame.Parent = psListHolder
-local plLayout = Instance.new("UIListLayout")
-plLayout.Padding = UDim.new(0, 4)
-plLayout.SortOrder = Enum.SortOrder.LayoutOrder
-plLayout.Parent = playerListFrame
-local plPad = Instance.new("UIPadding")
-plPad.PaddingRight = UDim.new(0, 4)
-plPad.Parent = psListHolder
-
+local outerScroll=Instance.new("ScrollingFrame") outerScroll.Name="OuterScroll" outerScroll.Position=UDim2.fromOffset(12,62) outerScroll.Size=UDim2.new(1,-24,1,-74) outerScroll.BackgroundTransparency=1 outerScroll.BorderSizePixel=0 outerScroll.CanvasSize=UDim2.new(0,0,0,0) outerScroll.ScrollBarThickness=4 outerScroll.ScrollBarImageColor3=Color3.fromRGB(65,65,75) outerScroll.Parent=teleportPage
+local stack=Instance.new("Frame") stack.Name="Stack" stack.Size=UDim2.new(1,-4,0,600) stack.BackgroundTransparency=1 stack.Parent=outerScroll local stackLayout=Instance.new("UIListLayout") stackLayout.Padding=UDim.new(0,10) stackLayout.SortOrder=Enum.SortOrder.LayoutOrder stackLayout.Parent=stack local stackPad=Instance.new("UIPadding") stackPad.PaddingTop=UDim.new(0,2) stackPad.PaddingBottom=UDim.new(0,6) stackPad.Parent=stack
+local gridFrame=Instance.new("Frame") gridFrame.Name="GridFrame" gridFrame.Size=UDim2.new(1,0,0,388) gridFrame.BackgroundTransparency=1 gridFrame.LayoutOrder=1 gridFrame.Parent=stack
+local grid=Instance.new("UIGridLayout") grid.CellPadding=UDim2.fromOffset(8,8) grid.CellSize=UDim2.fromOffset(212,56) grid.FillDirectionMaxCells=2 grid.HorizontalAlignment=Enum.HorizontalAlignment.Left grid.SortOrder=Enum.SortOrder.LayoutOrder grid.Parent=gridFrame
+-- players section now inside same scroll, below grid
+local playersSection=Instance.new("Frame") playersSection.Name="PlayersSection" playersSection.Size=UDim2.new(1,0,0,120) playersSection.BackgroundColor3=Color3.fromRGB(20,20,25) playersSection.LayoutOrder=2 playersSection.Parent=stack local psc=Instance.new("UICorner") psc.CornerRadius=UDim.new(0,12) psc.Parent=playersSection local pss=Instance.new("UIStroke") pss.Color=Color3.fromRGB(45,45,55) pss.Transparency=0.4 pss.Parent=playersSection local psp=Instance.new("UIPadding") psp.PaddingTop=UDim.new(0,10) psp.PaddingBottom=UDim.new(0,10) psp.PaddingLeft=UDim.new(0,10) psp.PaddingRight=UDim.new(0,10) psp.Parent=playersSection
+local psHeader=Instance.new("Frame") psHeader.BackgroundTransparency=1 psHeader.Size=UDim2.new(1,0,0,18) psHeader.Parent=playersSection local psTitle=Instance.new("TextLabel") psTitle.BackgroundTransparency=1 psTitle.Size=UDim2.new(1,-90,1,0) psTitle.Font=Enum.Font.GothamBold psTitle.Text="Teleport to Player" psTitle.TextColor3=Color3.fromRGB(255,255,255) psTitle.TextSize=11 psTitle.Parent=psHeader playerCountLabel=Instance.new("TextLabel") playerCountLabel.BackgroundTransparency=1 playerCountLabel.Position=UDim2.new(1,-90,0,0) playerCountLabel.Size=UDim2.new(0,90,1,0) playerCountLabel.Font=Enum.Font.Gotham playerCountLabel.Text="0 игроков" playerCountLabel.TextColor3=Color3.fromRGB(110,110,125) playerCountLabel.TextSize=10 playerCountLabel.TextXAlignment=Enum.TextXAlignment.Right playerCountLabel.Parent=psHeader
+local psSearchRow=Instance.new("Frame") psSearchRow.BackgroundTransparency=1 psSearchRow.Size=UDim2.new(1,0,0,26) psSearchRow.Parent=playersSection local psl=Instance.new("UIListLayout") psl.FillDirection=Enum.FillDirection.Horizontal psl.Padding=UDim.new(0,6) psl.VerticalAlignment=Enum.VerticalAlignment.Center psl.Parent=psSearchRow
+local sbf=Instance.new("Frame") sbf.Size=UDim2.new(1,-42,0,26) sbf.BackgroundColor3=Color3.fromRGB(26,26,32) sbf.Parent=psSearchRow local sbfc=Instance.new("UICorner") sbfc.CornerRadius=UDim.new(0,8) sbfc.Parent=sbf local sbfs=Instance.new("UIStroke") sbfs.Color=Color3.fromRGB(55,55,65) sbfs.Transparency=0.4 sbfs.Parent=sbf local si=Instance.new("TextLabel") si.BackgroundTransparency=1 si.Size=UDim2.fromOffset(22,26) si.Font=Enum.Font.Gotham si.Text="⌕" si.TextColor3=Color3.fromRGB(110,110,125) si.TextSize=13 si.Parent=sbf playerSearchBox=Instance.new("TextBox") playerSearchBox.BackgroundTransparency=1 playerSearchBox.Position=UDim2.fromOffset(22,0) playerSearchBox.Size=UDim2.new(1,-28,1,0) playerSearchBox.Font=Enum.Font.Gotham playerSearchBox.PlaceholderText="Поиск по нику..." playerSearchBox.Text="" playerSearchBox.TextColor3=Color3.fromRGB(255,255,255) playerSearchBox.PlaceholderColor3=Color3.fromRGB(110,110,125) playerSearchBox.TextSize=11 playerSearchBox.ClearTextOnFocus=false playerSearchBox.Parent=sbf
+playerRefreshBtn=Instance.new("TextButton") playerRefreshBtn.Size=UDim2.fromOffset(32,26) playerRefreshBtn.BackgroundColor3=Color3.fromRGB(32,32,38) playerRefreshBtn.Text="↻" playerRefreshBtn.Font=Enum.Font.GothamBold playerRefreshBtn.TextSize=13 playerRefreshBtn.TextColor3=Color3.fromRGB(170,170,180) playerRefreshBtn.Parent=psSearchRow local prc=Instance.new("UICorner") prc.CornerRadius=UDim.new(0,8) prc.Parent=playerRefreshBtn
+local psListHolder=Instance.new("Frame") psListHolder.Name="PlayersListHolder" psListHolder.BackgroundTransparency=1 psListHolder.Size=UDim2.new(1,0,0,60) psListHolder.Parent=playersSection playerListFrame=Instance.new("Frame") playerListFrame.BackgroundTransparency=1 playerListFrame.Size=UDim2.new(1,0,1,0) playerListFrame.Parent=psListHolder local pll=Instance.new("UIListLayout") pll.Padding=UDim.new(0,4) pll.SortOrder=Enum.SortOrder.LayoutOrder pll.Parent=playerListFrame
+-- toast
 -- ================= COINS PAGE =================
 local coinsPage = Instance.new("Frame")
 coinsPage.Name = "CoinsPage"
@@ -1546,7 +1400,7 @@ for idx, tp in ipairs(TELEPORTS) do
     card.Text = ""
     card.AutoButtonColor = false
     card.LayoutOrder = idx
-    card.Parent = scroll
+    card.Parent = gridFrame
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = card
@@ -1718,6 +1572,9 @@ task.spawn(function()
 end)
 
 -- players search + refresh wiring
+task.spawn(function() task.wait(0.15) local function upd() local rows=math.ceil(#TELEPORTS/2) local gridH=rows*64+4 gridFrame.Size=UDim2.new(1,0,0,gridH) local needPL=playerListFrame.AbsoluteContentSize.Y+4 if needPL<1 then needPL=34 end if needPL>120 then needPL=120 end psListHolder.Size=UDim2.new(1,0,0,needPL) local playersH=18+26+8+needPL+20 -- header+search+gap+list+pad
+ playersSection.Size=UDim2.new(1,0,0,playersH) local total=gridH+10+playersH+6 stack.Size=UDim2.new(1,-4,0,total) outerScroll.CanvasSize=UDim2.new(0,0,0,total+6) end upd() grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() upd() end) playerListFrame:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() upd() end) outerScroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(upd) for i=1,20 do task.wait(0.1) upd() end end)
+
 if playerSearchBox then
     playerSearchBox:GetPropertyChangedSignal("Text"):Connect(function()
         playerSearchText = playerSearchBox.Text
@@ -1734,15 +1591,12 @@ if playerRefreshBtn then
     playerRefreshBtn.MouseEnter:Connect(function() tween(playerRefreshBtn, {BackgroundColor3 = Color3.fromRGB(45,45,55)}, 0.12) end)
     playerRefreshBtn.MouseLeave:Connect(function() tween(playerRefreshBtn, {BackgroundColor3 = Color3.fromRGB(32,32,38)}, 0.12) end)
 end
--- авто-обновление списка игроков
+-- обновление списка игроков: только при входе/выходе и по кнопке/поиску (убрал while true каждые 2с — крашил)
 task.spawn(function()
-    task.wait(0.5)
-    refreshPlayerList()
-    Players.PlayerAdded:Connect(function() task.wait(0.3) refreshPlayerList() end)
-    Players.PlayerRemoving:Connect(function() task.wait(0.1) refreshPlayerList() end)
-    while task.wait(2) do
-        if teleportPage.Visible then refreshPlayerList() end
-    end
+    task.wait(0.6)
+    pcall(refreshPlayerList)
+    Players.PlayerAdded:Connect(function() task.wait(0.4) pcall(refreshPlayerList) end)
+    Players.PlayerRemoving:Connect(function() task.wait(0.1) pcall(refreshPlayerList) end)
 end)
 
 -- coins scroll canvas auto (UIListLayout)
@@ -1842,4 +1696,5 @@ end)
 setOpen(true, true)
 print("[TeleportHub v1.0.2] Loaded — ] to toggle • 12 teleports • Coins Collecting ready")
 notify("Teleport Hub v1.0.2", "] — меню • 2 категории • Coins: SCAN → START")
-task.spawn(function() task.wait(0.8) doCoinsScan(false) end)
+-- auto scan отключён чтобы не крашило на старте — только по кнопке SCAN
+-- task.spawn(function() task.wait(0.8) doCoinsScan(false) end)
