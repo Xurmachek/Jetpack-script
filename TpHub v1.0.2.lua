@@ -753,7 +753,7 @@ badgeText.TextColor3 = Color3.fromRGB(255,255,255)
 badgeText.TextSize = 10
 badgeText.Parent = badge
 
-local outerScroll=Instance.new("ScrollingFrame") outerScroll.Name="OuterScroll" outerScroll.Position=UDim2.fromOffset(12,62) outerScroll.Size=UDim2.new(1,-24,1,-74) outerScroll.BackgroundTransparency=1 outerScroll.BorderSizePixel=0 outerScroll.CanvasSize=UDim2.new(0,0,0,0) outerScroll.ScrollBarThickness=4 outerScroll.ScrollBarImageColor3=Color3.fromRGB(65,65,75) outerScroll.Parent=teleportPage
+local outerScroll=Instance.new("ScrollingFrame") outerScroll.Name="OuterScroll" outerScroll.Position=UDim2.fromOffset(12,62) outerScroll.Size=UDim2.new(1,-24,1,-74) outerScroll.BackgroundTransparency=1 outerScroll.BorderSizePixel=0 outerScroll.CanvasSize=UDim2.new(0,0,0,600) outerScroll.AutomaticCanvasSize=Enum.AutomaticSize.None outerScroll.ScrollingEnabled=true outerScroll.ScrollBarThickness=4 outerScroll.ScrollBarImageColor3=Color3.fromRGB(65,65,75) outerScroll.Parent=teleportPage
 local stack=Instance.new("Frame") stack.Name="Stack" stack.Size=UDim2.new(1,-4,0,600) stack.BackgroundTransparency=1 stack.Parent=outerScroll local stackLayout=Instance.new("UIListLayout") stackLayout.Padding=UDim.new(0,10) stackLayout.SortOrder=Enum.SortOrder.LayoutOrder stackLayout.Parent=stack local stackPad=Instance.new("UIPadding") stackPad.PaddingTop=UDim.new(0,2) stackPad.PaddingBottom=UDim.new(0,6) stackPad.Parent=stack
 local gridFrame=Instance.new("Frame") gridFrame.Name="GridFrame" gridFrame.Size=UDim2.new(1,0,0,388) gridFrame.BackgroundTransparency=1 gridFrame.LayoutOrder=1 gridFrame.Parent=stack
 local grid=Instance.new("UIGridLayout") grid.CellPadding=UDim2.fromOffset(8,8) grid.CellSize=UDim2.fromOffset(212,56) grid.FillDirectionMaxCells=2 grid.HorizontalAlignment=Enum.HorizontalAlignment.Left grid.SortOrder=Enum.SortOrder.LayoutOrder grid.Parent=gridFrame
@@ -1571,6 +1571,9 @@ startBtn.MouseEnter:Connect(function() tween(startBtn, {BackgroundColor3 = Color
 startBtn.MouseLeave:Connect(function() tween(startBtn, {BackgroundColor3 = Color3.fromRGB(16,185,129)}, 0.12) end)
 
 
+
+task.spawn(function() task.wait(0.15) local function upd() local rows=math.ceil(#TELEPORTS/2) local gridH=rows*64+4 gridFrame.Size=UDim2.new(1,0,0,gridH) local needPL=playerListFrame.AbsoluteContentSize.Y+4 if needPL<1 then needPL=34 end if needPL>120 then needPL=120 end psListHolder.Size=UDim2.new(1,0,0,needPL) local playersH=18+26+8+needPL+20 -- header+search+gap+list+pad
+ playersSection.Size=UDim2.new(1,0,0,playersH) local total=gridH+10+playersH+6 stack.Size=UDim2.new(1,-4,0,total) outerScroll.CanvasSize=UDim2.new(0,0,0,total+6) outerScroll.CanvasPosition=Vector2.new(0,0) end upd() grid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() upd() end) playerListFrame:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() task.wait() upd() end) outerScroll:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(upd) for i=1,20 do task.wait(0.1) upd() end end)
 
 if playerSearchBox then
     playerSearchBox:GetPropertyChangedSignal("Text"):Connect(function()
